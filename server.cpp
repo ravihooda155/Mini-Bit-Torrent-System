@@ -35,6 +35,8 @@ int main(int argc, char  *argv[])
     int addrlen = sizeof(address); 
     char buffer[1024] = {0};     
     struct hostent *tracker1;
+
+      vector<ClienTMesG> clientDetails;
     if((tracker1=gethostbyname(argv[1])) == NULL)
 {
     perror("gethostbyname()");
@@ -68,6 +70,7 @@ int main(int argc, char  *argv[])
 
 while(1) 
 {
+  
     if ((new_socket = accept(server_fd, (struct sockaddr *)&address,(socklen_t*)&addrlen))<0) 
     { 
         perror("accept"); 
@@ -92,7 +95,9 @@ while(1)
       cout<<"DATA RECEIVED"<<endl;
      
        std::vector<std::string> tokens;
+       tokens.clear();
         std::string token;
+        token="";
         std::istringstream tokenStream(buffer);
         while (std::getline(tokenStream, token, '#'))
         {
@@ -106,8 +111,34 @@ while(1)
                 cliMsg.port=tokens[2];
                 cliMsg.filename=tokens[3];
                 cliMsg.shahash=tokens[4];
-            displayCLIENT(cliMsg);
+                clientDetails.push_back(cliMsg);
+                displayCLIENT(cliMsg);
             
+        }
+        else if(tokens[0]=="get")
+        {
+            //cout<<"ip"<<tokens[1]<<endl;
+            //cout<<"port"<<tokens[2]<<endl;
+            //cout<<"sha"<<tokens[3]<<endl;
+            string retClientIP;
+            string retClientPort;
+            string file_sha=tokens[1];
+            for(int i=0;i<clientDetails.size();i++)
+            {
+                if(clientDetails[i].shahash==file_sha)
+                {
+                 retClientIP=clientDetails[i].CIAddr;
+                 retClientPort=clientDetails[i].port;
+                 break;
+                }
+            }
+            cout<<retClientIP<<retClientPort;
+            string mesg="";
+            mesg+=retClientIP;
+            mesg+="-";
+            mesg+=retClientPort;
+             send(new_socket , mesg.c_str(),mesg.length() , 0 );
+
         }
         
     }
