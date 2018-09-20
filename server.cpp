@@ -37,6 +37,12 @@ int main(int argc, char  *argv[])
     struct hostent *tracker1;
 
       vector<ClienTMesG> clientDetails;
+
+       if (argc !=3)
+     {
+      cout<<"enter all parameters"<<endl;
+    exit(1);
+    }
     if((tracker1=gethostbyname(argv[1])) == NULL)
 {
     perror("gethostbyname()");
@@ -65,7 +71,8 @@ int main(int argc, char  *argv[])
     } 
     else 
     {
-        printf("Listening to Client\n");
+      //  printf("Listening to Client\n");
+        cout<<"Listening to Client"<<endl;
     }
 
 while(1) 
@@ -88,6 +95,7 @@ while(1)
         else if (num == 0)
          {
             printf("Connection Closed");
+            cout<<"Connection Closed"<<endl;
             return 0;
         }
         buffer[num] = '\0';

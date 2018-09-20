@@ -116,6 +116,43 @@ string createfile(string src,string filename,string trackerIP,string trackerPort
     ft.close();
     return filleDetail;
 }
+
+void serv_peer(int* new_socket)
+{
+    char buffer[1024]={0};
+    int num=recv(*new_socket, buffer,1024,0);
+   
+        if (num== -1)
+	    {
+            perror("recv");
+            exit(1);
+        }   
+        else if (num == 0)
+         {
+            printf("Connection Closed");
+            //return 0;
+        }
+        
+        buffer[num] = '\0';
+    
+        cout<<buffer<<endl;
+        ///////////////////sending file
+        ////////////////////////////////////////////////
+        char sendData[100];int b=0;
+         FILE *fp = fopen(buffer, "rb");
+          if(fp == NULL)
+          {
+             perror("File");
+            }
+
+             while( (b = fread(sendData, 1, sizeof(sendData), fp))>0 )
+             {
+                 send(*new_socket, sendData, b, 0);
+            }
+         close(*new_socket);
+           fclose(fp);
+        //////////////////////////////////////////////////////////
+}
 void listenprocess(string cliIP,string port)
 {
     int client_d,new_socket;
@@ -154,7 +191,9 @@ void listenprocess(string cliIP,string port)
     } 
 
 
-	    int num=recv(new_socket, buffer,1024,0);
+ std::thread t(serv_peer,&new_socket);
+t.detach();
+/*	    int num=recv(new_socket, buffer,1024,0);
    
         if (num== -1)
 	    {
@@ -169,9 +208,34 @@ void listenprocess(string cliIP,string port)
         
         buffer[num] = '\0';
     
-        cout<<buffer<<endl;
+        cout<<buffer<<endl;*/
 }
  
+}
+void receivingfile(int* new_socket,string destPath)
+{
+                             char buffe[1025];
+                            FILE* fp = fopen( destPath.c_str(), "wb");
+                            int totByte=0;int b;
+                            if(fp != NULL){
+                            while( (b = recv(*new_socket, buffe, 1024,0))> 0 ) 
+                            {
+                                totByte+=b;
+                                fwrite(buffe, 1, b, fp);
+                            }
+
+                                cout<<"Byte Received"<<totByte<<endl;
+                                if (b<0)
+                                perror("Receiving");
+
+                                fclose(fp);
+                            } 
+                            else
+                             {
+                                perror("File");
+                            }
+                            close(*new_socket);
+
 }
 int main(int argc, char  *argv[]) 
 { 
@@ -185,6 +249,17 @@ int main(int argc, char  *argv[])
     string  mesg ;
     char buffer[1024]={0};
     int choice;
+
+    if (argc !=6)
+     {
+      cout<<"enter all parameters"<<endl;
+    exit(1);
+    }
+    char logfilePath[256];
+     realpath(argv[5], logfilePath);
+    ofstream logfile;
+    logfile.open(logfilePath);
+ 
     //////////////////client ///////////////////////////////
     
      
@@ -229,11 +304,13 @@ while(1)
                             if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) 
                             { 
                             cout<<"\n Socket creation error \n"; 
+                            logfile<<"\n Socket creation error \n";
                                 return -1; 
                             }    
                             if (connect(sock, (struct sockaddr *)&tracker_addr, sizeof(tracker_addr)) < 0) 
                             { 
                             cout<<"\nConnection Failed \n"; 
+                            logfile<<"\nConnection Failed \n"; 
                                 return -1; 
                             } 
                           //  string filepath=tokens[1];
@@ -256,7 +333,8 @@ while(1)
                             
                             mesg+=retmesg;
                             send(sock , mesg.c_str(),mesg.length() , 0 ); 
-                            cout<<"File created\n"; 
+                            cout<<"Torrent File created\n"; 
+                            logfile<<"Torrent File created\n"; 
                             close(sock);
                             
                 }  
@@ -293,6 +371,7 @@ while(1)
                             }
                             string tracker_IP=tokens[0];
                             string tracker_Port=tokens[1];
+                            string fileSourcePath=tokens[2];
                             string file_Sha=tokens[4];
 
                           // cout<<file_Sha<<tracker_IP<<tracker_Port;
@@ -306,11 +385,13 @@ while(1)
                             if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) 
                             { 
                             cout<<"\n Socket creation error \n"; 
+                            logfile<<"\n Socket creation error \n"; 
                                 return -1; 
                             }    
                             if (connect(sock, (struct sockaddr *)&tracke11_addr, sizeof(tracke11_addr)) < 0) 
                             { 
                             cout<<"\nConnection Failed \n"; 
+                            logfile<<"\nConnection Failed \n"; 
                                 return -1; 
                             } 
                             mesg="";
@@ -321,6 +402,7 @@ while(1)
                             
                             send(sock , mesg.c_str(),mesg.length() , 0 ); 
                             cout<<"Send to tracker\n"; 
+                            logfile<<"Hash data send to tracker"<<endl; 
                             /////////////////////////peer details////////////////////////////
                              int num;
                             
@@ -331,7 +413,8 @@ while(1)
                                }   
                             else if (num == 0)
                             {
-                             printf("Connection Closed");
+                             cout<<"Connection Closed\n";
+                             logfile<<"Connection Closed\n";
                              return 0;
                              }
                              buffer[num] = '\0';
@@ -348,7 +431,8 @@ while(1)
                             string peer_IP=tokens[0];
                             string peer_PORT=tokens[1];
                              cout<<peer_IP<<peer_PORT;
-                             cout<<"peer details received";
+                             cout<<"peer details received"<<endl;
+                             logfile<<"peer details received"<<endl;
                             close(sock);
 
                                 /////////////////connecting to peer //////////////////////////
@@ -360,24 +444,57 @@ while(1)
                                     if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) 
                             { 
                             cout<<"\n Socket creation error \n"; 
+                            logfile<<"\n Socket creation error \n"; 
                                 return -1; 
                             }    
                             if (connect(sock, (struct sockaddr *)&peer_addr, sizeof(peer_addr)) < 0) 
                             { 
                             cout<<"\nConnection Failed \n"; 
+                            logfile<<"\nConnection Failed \n"; 
                                 return -1; 
                             }  
                              mesg="";
-                            mesg+="hello client";
+                            mesg+=fileSourcePath;
                            
                             send(sock , mesg.c_str(),mesg.length() , 0 ); 
-                            cout<<"Send to peer"<<endl; 
-                            close(sock);
+                            cout<<"Send to peer"<<endl;
+                            logfile<< "Send to peer"<<endl;
+
+                            ////////
+                           /////////////////////////// receiving file//////////////////////////////
+
+                            
+                             std::thread t(receivingfile,&sock,destPath);
+                             t.detach();
+                            ///////////////
+                          /*  char buffe[1025];
+                            FILE* fp = fopen( destPath.c_str(), "wb");
+                            int totByte=0;int b;
+                            if(fp != NULL){
+                            while( (b = recv(sock, buffe, 1024,0))> 0 ) 
+                            {
+                                totByte+=b;
+                                fwrite(buffe, 1, b, fp);
+                            }
+
+                                cout<<"Byte Received"<<totByte<<endl;
+                                if (b<0)
+                                perror("Receiving");
+
+                                fclose(fp);
+                            } 
+                            else
+                             {
+                                perror("File");
+                            }
+                            /////////////
+                            close(sock);*/
                             
                 }
                
             }
   close(client_d);
+  logfile.close();
     return 0; 
 } 
  
