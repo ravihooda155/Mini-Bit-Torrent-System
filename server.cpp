@@ -128,27 +128,67 @@ while(1)
             //cout<<"ip"<<tokens[1]<<endl;
             //cout<<"port"<<tokens[2]<<endl;
             //cout<<"sha"<<tokens[3]<<endl;
+             string mesg="";
             string retClientIP;
             string retClientPort;
             string file_sha=tokens[1];
+            bool flag=false;
             for(int i=0;i<clientDetails.size();i++)
             {
                 if(clientDetails[i].shahash==file_sha)
                 {
                  retClientIP=clientDetails[i].CIAddr;
                  retClientPort=clientDetails[i].port;
+                 flag=true;
                  break;
                 }
             }
-            cout<<retClientIP<<retClientPort;
-            string mesg="";
+            if(!flag)
+            {
+                cout<<"File not shared"<<endl;
+                 send(new_socket , mesg.c_str(),mesg.length() , 0 );
+               goto exitprogram;
+            }
+            //cout<<retClientIP<<retClientPort;
+           
             mesg+=retClientIP;
             mesg+="-";
             mesg+=retClientPort;
              send(new_socket , mesg.c_str(),mesg.length() , 0 );
 
         }
+        else if(tokens[0]=="remove")
+        {
+            int i;
+             string mesg="";
+            string file_sha=tokens[1];
+            bool flag=false;
+            for( i=0;i<clientDetails.size();i++)
+            {
+                if(clientDetails[i].shahash==file_sha)
+                {
+            
+                 flag=true;
+                 break;
+                }
+            }
+            
+            if(!flag)
+            {
+                cout<<"File not shared"<<endl;
+                 send(new_socket , mesg.c_str(),mesg.length() , 0 );
+                goto exitprogram;
+            }
+            else
+            {
+                clientDetails.erase(clientDetails.begin()+i);
+            }
         
+            mesg+="torrent entry removed";
+             send(new_socket , mesg.c_str(),mesg.length() , 0 );
+        }
+        exitprogram:
+        close(new_socket);
     }
 close(server_fd);
 

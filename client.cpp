@@ -298,6 +298,8 @@ while(1)
 			{
 				tokens.push_back(rawcode);
 			}	
+            if(tokens.size()==3)
+            {
            if(tokens[0]=="share")
             {
                             
@@ -415,7 +417,7 @@ while(1)
                             {
                              cout<<"Connection Closed\n";
                              logfile<<"Connection Closed\n";
-                             return 0;
+                             exit(1);
                              }
                              buffer[num] = '\0';
                              // std::vector<std::string> tokens;
@@ -491,7 +493,105 @@ while(1)
                             close(sock);*/
                             
                 }
-               
+                else
+                {
+                    cout<<"command not found"<<endl;
+                }
+            }
+            else if(tokens.size()==2)
+            {
+                if(tokens[0]=="remove")
+                {
+
+                              char  torrentpath[256];
+                             realpath((tokens[1]).c_str(), torrentpath);
+                             struct sockaddr_in tracke11_addr; 
+                             struct sockaddr_in peer_addr;
+                            ifstream input;
+                            input.open(torrentpath);
+                            string output;
+                            while(input)
+                            {
+                                string line;
+                                getline(input,line,'=');
+                                string val;
+                                input>>val;
+                                output+=val+"#";
+                                //cout<<line<<"-----"<<val;
+                            }
+                            input.close();
+                            std::vector<std::string> tokens;
+                             tokens.clear();
+                             std::string token;
+                             token="";
+                              std::istringstream tokenStream(output);
+                            while (std::getline(tokenStream, token, '#'))
+                           {
+                            tokens.push_back(token);
+                            }
+                            string tracker_IP=tokens[0];
+                            string tracker_Port=tokens[1];
+                            string fileSourcePath=tokens[2];
+                            string file_Sha=tokens[4];
+
+                          // cout<<file_Sha<<tracker_IP<<tracker_Port;
+
+                            memset(&tracke11_addr, '0', sizeof(tracke11_addr));  
+                            tracke11_addr.sin_family = AF_INET; 
+                            tracke11_addr.sin_addr.s_addr = inet_addr(tracker_IP.c_str()); 
+                            tracke11_addr.sin_port =   htons((unsigned short)strtoul(tracker_Port.c_str(), NULL, 0)); 
+
+                            ////////////////////request to tracker/////////////////////////////
+                            if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) 
+                            { 
+                            cout<<"\n Socket creation error \n"; 
+                            logfile<<"\n Socket creation error \n"; 
+                                return -1; 
+                            }    
+                            
+                            if (connect(sock, (struct sockaddr *)&tracke11_addr, sizeof(tracke11_addr)) < 0) 
+                            { 
+                            cout<<"\nConnection Failed \n"; 
+                            logfile<<"\nConnection Failed \n"; 
+                                return -1; 
+                            } 
+                            mesg="";
+                            mesg+="remove";
+                          
+                            mesg+="#";
+                            mesg+=(file_Sha);
+                            
+                            send(sock , mesg.c_str(),mesg.length() , 0 ); 
+                            cout<<"Send to tracker\n"; 
+                            logfile<<"Hash data send to tracker"<<endl; 
+                            /////////////////////////peer details////////////////////////////
+                             int num;
+                            
+                            if ((num=recv(sock, buffer,1024,0))== -1)
+	                          {
+                               perror("recv");
+                                exit(1);
+                               }   
+                            else if (num == 0)
+                            {
+                             cout<<"Connection Closed\n";
+                             logfile<<"Connection Closed\n";
+                             exit(1);
+                             }
+                             buffer[num] = '\0';
+                             cout<<buffer<<endl;
+                             close(sock);
+
+                }
+                else
+                {
+                    cout<<"command not found"<<endl;
+                }
+            }
+            else
+            {
+                cout<<"command not found"<<endl;
+            }
             }
   close(client_d);
   logfile.close();
