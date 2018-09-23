@@ -14,6 +14,20 @@
 #include<netdb.h>
 #include <cstdlib>
 #include<pthread.h>
+#include <ctime>
+#include<dirent.h>
+#define PBSTR "||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||"
+#define PBWIDTH 60
+
+void printProgress (double percentage)
+{
+    int val = (int) (percentage * 100);
+    int lpad = (int) (percentage * PBWIDTH);
+    int rpad = PBWIDTH - lpad;
+    printf ("\r%3d%% [%.*s%*s]", val, lpad, PBSTR, rpad, "");
+    fflush (stdout);
+}
+const time_t ctt = time(0);
 using namespace std;
 
 int sha1(  char * name, unsigned char * out )
@@ -138,17 +152,30 @@ void serv_peer(int* new_socket)
         cout<<buffer<<endl;
         ///////////////////sending file
         ////////////////////////////////////////////////
-        char sendData[100];int b=0;
+
+  struct stat filestatus;
+  stat(buffer, &filestatus);
+
+  size_t total_size = filestatus.st_size;
+  double percentage;
+        char sendData[512*1024];int b=0;int total=0;
          FILE *fp = fopen(buffer, "rb");
           if(fp == NULL)
           {
              perror("File");
             }
-
+            cout<<"Uploading......."<<endl;
              while( (b = fread(sendData, 1, sizeof(sendData), fp))>0 )
              {
                  send(*new_socket, sendData, b, 0);
+                 total=total+b;
+
+                 percentage=(double)total/total_size;
+                    printProgress(percentage);
+                           cout<<endl;        
+             //  cout<<"Uploading-->"<<percentage*100<<"%"<<endl;
             }
+
          close(*new_socket);
            fclose(fp);
         //////////////////////////////////////////////////////////
@@ -212,16 +239,24 @@ t.detach();
 }
  
 }
-void receivingfile(int* new_socket,string destPath)
+void receivingfile(int* new_socket,string destPath,string filesize)
 {
-                             char buffe[1025];
+                             char buffe[1024*512];
+                             double percentage;
+                             size_t size=stoi(filesize);
                             FILE* fp = fopen( destPath.c_str(), "wb");
-                            int totByte=0;int b;
+                            int totByte=0;
+                            int b;
+                            cout<<"Downloading......."<<endl;
                             if(fp != NULL){
-                            while( (b = recv(*new_socket, buffe, 1024,0))> 0 ) 
+                            while( (b = recv(*new_socket, buffe, 512*1024,0))> 0 ) 
                             {
                                 totByte+=b;
                                 fwrite(buffe, 1, b, fp);
+                                percentage=(double)totByte/size;
+                           printProgress(percentage);
+                           cout<<endl;
+                               //cout<<"Downloading-->"<<percentage*100<<"%"<<endl;
                             }
 
                                 cout<<"Byte Received"<<totByte<<endl;
@@ -249,17 +284,21 @@ int main(int argc, char  *argv[])
     string  mesg ;
     char buffer[1024]={0};
     int choice;
-
+     char logfilePath[256];
+     realpath(argv[5], logfilePath);
+    ofstream logfile;
+    logfile.open(logfilePath,std::ios_base::app);
+      logfile<<"------------------------------------------------------------"<<endl;
+       logfile << asctime(localtime(&ctt)); 
+        logfile<<"------------------------------------------------------------"<<endl;
     if (argc !=6)
      {
+         logfile << asctime(localtime(&ctt)) <<"####"<<"enter all parameters in arguments"<<endl;
       cout<<"enter all parameters"<<endl;
     exit(1);
     }
-    char logfilePath[256];
-     realpath(argv[5], logfilePath);
-    ofstream logfile;
-    logfile.open(logfilePath);
- 
+   
+    
     //////////////////client ///////////////////////////////
     
      
@@ -303,19 +342,21 @@ while(1)
            if(tokens[0]=="share")
             {
                             
+                             logfile << asctime(localtime(&ctt))<<"####"<<"Inside Share Portal"<<endl; 
                             if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) 
                             { 
                             cout<<"\n Socket creation error \n"; 
-                            logfile<<"\n Socket creation error \n";
+                            logfile << asctime(localtime(&ctt)) <<"####"<<"Socket creation error ";
                                 return -1; 
                             }    
                             if (connect(sock, (struct sockaddr *)&tracker_addr, sizeof(tracker_addr)) < 0) 
                             { 
                             cout<<"\nConnection Failed \n"; 
-                            logfile<<"\nConnection Failed \n"; 
+                             logfile << asctime(localtime(&ctt)) <<"####"<<"Connection Failed "; 
                                 return -1; 
                             } 
                           //  string filepath=tokens[1];
+                            logfile<<asctime(localtime(&ctt))<<"####"<<"Connected to Tracker"<<endl; 
                           char  filepath[256];
                           realpath((tokens[1]).c_str(), filepath);
                             string filetorrpath;
@@ -335,14 +376,17 @@ while(1)
                             
                             mesg+=retmesg;
                             send(sock , mesg.c_str(),mesg.length() , 0 ); 
+                            
                             cout<<"Torrent File created\n"; 
-                            logfile<<"Torrent File created\n"; 
+                             logfile << asctime(localtime(&ctt))<<"####"<<"Torrent File created"<<endl; 
                             close(sock);
                             
+                             logfile << asctime(localtime(&ctt))<<"####"<<" Share Portal Closed"<<endl; 
                 }  
                 else if(tokens[0]=="get")
                 {
                              
+                             logfile << asctime(localtime(&ctt))<<"####"<<"Inside Get Portal"<<endl; 
                               char  torrentpath[256];
                              realpath((tokens[1]).c_str(), torrentpath);
                              string destPath=tokens[2];
@@ -374,6 +418,7 @@ while(1)
                             string tracker_IP=tokens[0];
                             string tracker_Port=tokens[1];
                             string fileSourcePath=tokens[2];
+                            string filesize=tokens[3];
                             string file_Sha=tokens[4];
 
                           // cout<<file_Sha<<tracker_IP<<tracker_Port;
@@ -386,16 +431,18 @@ while(1)
                             ////////////////////request to tracker/////////////////////////////
                             if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) 
                             { 
-                            cout<<"\n Socket creation error \n"; 
-                            logfile<<"\n Socket creation error \n"; 
+                            cout<<"Socket creation error\n"; 
+                              logfile << asctime(localtime(&ctt))<<"####";
+                            logfile<<"Socket creation error"<<endl; 
                                 return -1; 
                             }    
                             if (connect(sock, (struct sockaddr *)&tracke11_addr, sizeof(tracke11_addr)) < 0) 
                             { 
                             cout<<"\nConnection Failed \n"; 
-                            logfile<<"\nConnection Failed \n"; 
+                             logfile << asctime(localtime(&ctt))<<"####"<<"\nConnection Failed \n"; 
                                 return -1; 
                             } 
+                              logfile << asctime(localtime(&ctt)) <<"####"<<"Connected to Tracker"<<endl; 
                             mesg="";
                             mesg+="get";
                           
@@ -404,7 +451,7 @@ while(1)
                             
                             send(sock , mesg.c_str(),mesg.length() , 0 ); 
                             cout<<"Send to tracker\n"; 
-                            logfile<<"Hash data send to tracker"<<endl; 
+                             logfile << asctime(localtime(&ctt))<<"####"<<"File extraction details send to tracker"<<endl; 
                             /////////////////////////peer details////////////////////////////
                              int num;
                             
@@ -416,9 +463,10 @@ while(1)
                             else if (num == 0)
                             {
                              cout<<"Connection Closed\n";
-                             logfile<<"Connection Closed\n";
+                              logfile << asctime(localtime(&ctt))<<"####"<<"Connection Closed\n";
                              exit(1);
                              }
+                               logfile << asctime(localtime(&ctt)) <<"####"<<"Peer Details Received From Tracker"<<endl; 
                              buffer[num] = '\0';
                              // std::vector<std::string> tokens;
                              tokens.clear();
@@ -434,7 +482,6 @@ while(1)
                             string peer_PORT=tokens[1];
                              cout<<peer_IP<<peer_PORT;
                              cout<<"peer details received"<<endl;
-                             logfile<<"peer details received"<<endl;
                             close(sock);
 
                                 /////////////////connecting to peer //////////////////////////
@@ -446,13 +493,13 @@ while(1)
                                     if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) 
                             { 
                             cout<<"\n Socket creation error \n"; 
-                            logfile<<"\n Socket creation error \n"; 
+                             logfile << asctime(localtime(&ctt))<<"####"<<"\n Socket creation error \n"; 
                                 return -1; 
                             }    
                             if (connect(sock, (struct sockaddr *)&peer_addr, sizeof(peer_addr)) < 0) 
                             { 
                             cout<<"\nConnection Failed \n"; 
-                            logfile<<"\nConnection Failed \n"; 
+                             logfile << asctime(localtime(&ctt))<<"####"<<"\nConnection Failed \n"; 
                                 return -1; 
                             }  
                              mesg="";
@@ -460,13 +507,13 @@ while(1)
                            
                             send(sock , mesg.c_str(),mesg.length() , 0 ); 
                             cout<<"Send to peer"<<endl;
-                            logfile<< "Send to peer"<<endl;
+                             logfile << asctime(localtime(&ctt))<<"####"<< "Sending File  to Peer"<<endl;
 
                             ////////
                            /////////////////////////// receiving file//////////////////////////////
 
                             
-                             std::thread t(receivingfile,&sock,destPath);
+                             std::thread t(receivingfile,&sock,destPath,filesize);
                              t.detach();
                             ///////////////
                           /*  char buffe[1025];
@@ -492,6 +539,7 @@ while(1)
                             /////////////
                             close(sock);*/
                             
+                             logfile << asctime(localtime(&ctt))<<"####"<<" Get Portal closed"<<endl; 
                 }
                 else
                 {
@@ -503,6 +551,7 @@ while(1)
                 if(tokens[0]=="remove")
                 {
 
+                             logfile << asctime(localtime(&ctt))<<"####"<<"Inside Remove Portal"<<endl; 
                               char  torrentpath[256];
                              realpath((tokens[1]).c_str(), torrentpath);
                              struct sockaddr_in tracke11_addr; 
@@ -536,6 +585,7 @@ while(1)
 
                           // cout<<file_Sha<<tracker_IP<<tracker_Port;
 
+                               logfile << asctime(localtime(&ctt)) <<":"<<"Connecting To Tracker"<<endl; 
                             memset(&tracke11_addr, '0', sizeof(tracke11_addr));  
                             tracke11_addr.sin_family = AF_INET; 
                             tracke11_addr.sin_addr.s_addr = inet_addr(tracker_IP.c_str()); 
@@ -545,16 +595,18 @@ while(1)
                             if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) 
                             { 
                             cout<<"\n Socket creation error \n"; 
-                            logfile<<"\n Socket creation error \n"; 
+                             logfile << asctime(localtime(&ctt)) <<"####"<<"\n Socket creation error \n"; 
                                 return -1; 
                             }    
                             
                             if (connect(sock, (struct sockaddr *)&tracke11_addr, sizeof(tracke11_addr)) < 0) 
                             { 
                             cout<<"\nConnection Failed \n"; 
-                            logfile<<"\nConnection Failed \n"; 
+                             logfile << asctime(localtime(&ctt)) <<"####"<<"\nConnection Failed \n"; 
                                 return -1; 
                             } 
+
+                               logfile << asctime(localtime(&ctt)) <<"####"<<"Connected To Tracker"<<endl; 
                             mesg="";
                             mesg+="remove";
                           
@@ -563,7 +615,7 @@ while(1)
                             
                             send(sock , mesg.c_str(),mesg.length() , 0 ); 
                             cout<<"Send to tracker\n"; 
-                            logfile<<"Hash data send to tracker"<<endl; 
+                             logfile << asctime(localtime(&ctt)) <<"####"<<"File Details send to tracker"<<endl; 
                             /////////////////////////peer details////////////////////////////
                              int num;
                             
@@ -575,12 +627,37 @@ while(1)
                             else if (num == 0)
                             {
                              cout<<"Connection Closed\n";
+                              logfile << asctime(localtime(&ctt)) <<"####";
                              logfile<<"Connection Closed\n";
                              exit(1);
                              }
                              buffer[num] = '\0';
                              cout<<buffer<<endl;
+
+                               logfile << asctime(localtime(&ctt)) <<"####"<<buffer<<endl; 
                              close(sock);
+
+                             logfile << asctime(localtime(&ctt))<<"####"<<"Remove Portal Closed"<<endl; 
+                }
+                else  if(tokens[0]=="show")
+                {
+                     logfile << asctime(localtime(&ctt))<<"####"<<"Inside Show Portal"<<endl; 
+                    char  dirname[256];
+                    realpath((tokens[1]).c_str(), dirname);
+                    DIR *dir;
+                	dirent *pdir;
+                    vector<string>DirectryList;
+                    dir=opendir(dirname);
+                    while((pdir=readdir(dir))!=NULL)
+                    {	string filename((pdir->d_name));
+                        DirectryList.push_back(filename);
+                    }
+                    for(int i=0;i<DirectryList.size();i++)
+                    {
+                        if(DirectryList[i]!="."&&DirectryList[i]!="..")
+                        cout<<DirectryList[i]<<endl;
+                    }
+                     logfile << asctime(localtime(&ctt))<<"####"<<" Show Portal Closed"<<endl; 
 
                 }
                 else
